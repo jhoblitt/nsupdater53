@@ -8,7 +8,14 @@ Record = Struct.new(:name, :ttl, :type, :value)
 def parse_record(line)
   # "update add _kerberos-master._tcp.lsst.cloud. 86400 IN SRV 0 100 88 ipamaster1.tuc.lsst.cloud.\n"
   line.match(/^update add (?<name>\S+) (?<ttl>\d+) IN (?<type>\S+) (?<value>.*)$/) { |m|
-    return Record.new(*m.captures)
+    r = Record.new(*m.captures)
+
+    # remove quotes from TXT records
+    if m['type'] == 'TXT'
+      r.value = m['value'].gsub(/"/, '')
+    end
+
+    return  r
   }
 end
 
