@@ -27,7 +27,7 @@ def merge_records(cmds)
 
   cmds.each { |name, set|
     if set.length > 1
-      values = set.collect { |r| r.value }.join("\n")
+      values = set.collect { |r| r.value }
       r = set.first
       recs << Record.new(
         name,
@@ -82,7 +82,7 @@ recs.each { |r|
       name    = "#{r.name}"
       type    = "#{r.type}"
       ttl     = "#{r.ttl}"
-      records = [#{r.value.dump}]
+      records = #{Array(r.value)}
     }
 
   HCL
