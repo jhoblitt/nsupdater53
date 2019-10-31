@@ -5,7 +5,7 @@ zone_id = ARGV[1]
 
 Record = Struct.new(:name, :ttl, :type, :value)
 
-def parse_record(line)
+def parse_cmd(line)
   # "update add _kerberos-master._tcp.lsst.cloud. 86400 IN SRV 0 100 88 ipamaster1.tuc.lsst.cloud.\n"
   line.match(/^update add (?<name>\S+) (?<ttl>\d+) IN (?<type>\S+) (?<value>.*)$/) { |m|
     r = Record.new(*m.captures)
@@ -19,7 +19,33 @@ def parse_record(line)
   }
 end
 
-recs = []
+# merge the value of multiple nsupdate commands that are applying to the same
+# SRV record
+def merge_records(cmds)
+  # flat list of records
+  recs = []
+
+  cmds.each { |name, set|
+    if set.length > 1
+      values = set.collect { |r| r.value }.join("\n")
+      r = set.first
+      recs << Record.new(
+        name,
+        r.ttl,
+        r.type,
+        values,
+      )
+    else
+      recs << set.first
+    end
+  }
+
+  return recs
+end
+
+# Hash of Lists of commands
+cmds = {}
+
 File.open(nsfile, "r") do |file_handle|
   file_handle.each_line do |line|
     # skip comment lines
@@ -31,9 +57,18 @@ File.open(nsfile, "r") do |file_handle|
     # skip "update delete" lines
     next if line =~ /^\s*update delete/
 
-    recs << parse_record(line)
+    r = parse_cmd(line)
+    if cmds.key?(r.name)
+      cmds[r.name] << r
+      next
+    else
+      cmds[r.name] = [r]
+    end
   end
 end
+
+# flat List of records
+recs = merge_records(cmds)
 
 recs.each { |r|
   tmpl = <<~HCL
@@ -43,7 +78,7 @@ recs.each { |r|
       name    = "#{r.name}"
       type    = "#{r.type}"
       ttl     = "#{r.ttl}"
-      records = ["#{r.value}"]
+      records = [#{r.value.dump}]
     }
 
   HCL
