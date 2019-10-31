@@ -71,8 +71,12 @@ end
 recs = merge_records(cmds)
 
 recs.each { |r|
+  sanitized_name = r.name.dup
+  # tf does not like `.` in resource names
+  sanitized_name.tr!('.', '_')
+
   tmpl = <<~HCL
-    resource "aws_route53_record" "#{r.name}" {
+    resource "aws_route53_record" "#{sanitized_name}" {
       zone_id = "#{zone_id}"
 
       name    = "#{r.name}"
